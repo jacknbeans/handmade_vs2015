@@ -23,3 +23,25 @@ typedef float real32;
 typedef double real64;
 
 #define ArrayCount(a_Array) (sizeof(a_Array) / sizeof((a_Array)[0]))
+
+#define Kilobytes(a_Value) ((a_Value) * 1024)
+#define Megabytes(a_Value) (Kilobytes(a_Value) * 1024)
+#define Gigabytes(a_Value) (Megabytes(a_Value) * 1024)
+#define Terabytes(a_Value) (Gigabytes(a_Value) * 1024)
+
+/*
+ * HANDMADE_INTERNAL:
+ *     0 - Build for public release
+ *     1 - Build for developer only
+ *     
+ * HANDMADE_SLOW:
+ *     0 - No slow code allowed!
+ *     1 - Slow code welcome.
+ */
+
+
+#if HANDMADE_SLOW
+#define Assert(a_Expression) if (!(a_Expression)) { *(int *)0 = 0;}
+#else
+#define Assert(a_Expression)
+#endif

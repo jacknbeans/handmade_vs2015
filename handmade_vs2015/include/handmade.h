@@ -53,6 +53,23 @@ struct GameInput {
 	GameControllerInput controllers[4];
 };
 
-internal void GameUpdateAndRender(GameOffscreenBuffer *a_Buffer,
+struct GameState {
+	int toneHz;
+	int blueOffset;
+	int greenOffset;
+};
+
+struct GameMemory {
+	bool32 isInitialized;
+
+	uint64 permanentStorageSize;
+	void *permanentStorage;
+
+	uint64 transientStorageSize;
+	void *transientStorage;
+};
+
+internal void GameUpdateAndRender(GameMemory *a_GameMemory,
+                                  GameOffscreenBuffer *a_Buffer,
                                   GameSoundOutputBuffer *a_SoundBuffer,
                                   GameInput *a_Input);
