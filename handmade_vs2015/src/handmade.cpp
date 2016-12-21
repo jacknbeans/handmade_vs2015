@@ -5,7 +5,7 @@
 internal void GameOutputSound(GameSoundOutputBuffer *a_SoundBuffer,
                               int a_ToneHz) {
 	local_persist real32 tSine;
-	int16 toneVolume = 3000;
+	auto toneVolume = int16(3000);
 	auto wavePeriod = a_SoundBuffer->samplesPerSecond / a_ToneHz;
 
 	auto sampleOut = a_SoundBuffer->samples;
