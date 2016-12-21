@@ -29,7 +29,66 @@ global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 	name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
-void *PlatformLoadFile(char *a_FileName) { return nullptr; }
+internal DebugReadFileResult DEBUGPlatformReadEntireFile(char *a_Filename) {
+	DebugReadFileResult result = {};
+
+	auto fileHandle = CreateFileA(a_Filename, GENERIC_READ, FILE_SHARE_READ,
+	                              nullptr, OPEN_EXISTING, 0, nullptr);
+	if (fileHandle != INVALID_HANDLE_VALUE) {
+		LARGE_INTEGER fileSize;
+		if (GetFileSizeEx(fileHandle, &fileSize)) {
+			auto fileSize32 = SafeTruncateUInt64(fileSize.QuadPart);
+			result.contents = VirtualAlloc(nullptr, fileSize32, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			if (result.contents) {
+				DWORD bytesRead;
+				if (ReadFile(fileHandle, result.contents, fileSize32, &bytesRead, nullptr) &&
+					fileSize32 == bytesRead) {
+					result.contentsSize = fileSize32;
+				} else {
+					DEBUGPlatformFreeFileMemory(result.contents);
+					result.contents = nullptr;
+				}
+			} else {
+				// TODO: Logging
+			}
+		} else {
+			// TODO: Logging
+		}
+
+		CloseHandle(fileHandle);
+	} else {
+		// TODO: Logging	
+	}
+
+	return result;
+}
+
+internal void DEBUGPlatformFreeFileMemory(void *a_Memory) {
+	if (a_Memory) {
+		VirtualFree(a_Memory, 0, MEM_RELEASE);
+	}
+}
+
+internal bool32 DEBUGPlatformWriteEntireFile(char *a_Filename, uint32 a_MemorySize, void *a_Memory) {
+	bool32 result = false;
+
+	// IMPORTANT: Create file doesn't create a directory!
+	auto fileHandle = CreateFileA(a_Filename, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr);
+	if (fileHandle != INVALID_HANDLE_VALUE) {
+		DWORD bytesWritten;
+		if (WriteFile(fileHandle, a_Memory, a_MemorySize, &bytesWritten, nullptr)) {
+			result = bytesWritten == a_MemorySize;
+		} else {
+			// TODO: Logging
+		}
+
+		CloseHandle(fileHandle);
+	} else {
+		// TODO: Logging
+	}
+
+	return result;
+}
 
 internal void Win32LoadXInput(void) {
 	auto xInputLibrary = LoadLibraryA("xinput1_4.dll");
@@ -341,7 +400,7 @@ int CALLBACK WinMain(HINSTANCE a_Instance, HINSTANCE a_PrevInstance,
 				                                  MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
 
 #if HANDMADE_INTERNAL
-			LPVOID baseAddress = LPVOID(Terabytes(uint64(2)));
+			auto baseAddress = LPVOID(Terabytes(uint64(2)));
 #else
 			LPVOID baseAddress = nullptr;
 #endif
@@ -350,9 +409,9 @@ int CALLBACK WinMain(HINSTANCE a_Instance, HINSTANCE a_PrevInstance,
 			gameMemory.permanentStorageSize = Megabytes(64);
 			gameMemory.transientStorageSize = Gigabytes(uint64(4));
 
-			uint64 totalSize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
+			auto totalSize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
 			gameMemory.permanentStorage = VirtualAlloc(baseAddress, totalSize,
-				MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			                                           MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 			gameMemory.transientStorage = static_cast<uint8 *>(gameMemory.permanentStorage) +
 				gameMemory.permanentStorageSize;
 

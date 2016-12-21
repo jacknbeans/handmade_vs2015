@@ -43,7 +43,16 @@ internal void GameUpdateAndRender(GameMemory *a_GameMemory,
 	Assert(sizeof(GameState) <= a_GameMemory->permanentStorageSize);
                                   	
 	auto gameState = reinterpret_cast<GameState *>(a_GameMemory->permanentStorage);
-	if (a_GameMemory->isInitialized) {
+	if (!a_GameMemory->isInitialized) {
+		char *fileName = __FILE__;
+
+		auto file = DEBUGPlatformReadEntireFile(fileName);
+		if (file.contents) {
+			DEBUGPlatformWriteEntireFile("w:/handmade_vs2015/handmade_vs2015/data/test.out",
+			                             file.contentsSize, file.contents);
+			DEBUGPlatformFreeFileMemory(file.contents);
+		}
+
 		gameState->toneHz = 256;
 
 		a_GameMemory->isInitialized = true;
