@@ -29,7 +29,7 @@ global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
 	name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
-internal DebugReadFileResult DEBUGPlatformReadEntireFile(char *a_Filename) {
+DebugReadFileResult DEBUGPlatformReadEntireFile(char *a_Filename) {
 	DebugReadFileResult result = {};
 
 	auto fileHandle = CreateFileA(a_Filename, GENERIC_READ, FILE_SHARE_READ,
@@ -38,7 +38,8 @@ internal DebugReadFileResult DEBUGPlatformReadEntireFile(char *a_Filename) {
 		LARGE_INTEGER fileSize;
 		if (GetFileSizeEx(fileHandle, &fileSize)) {
 			auto fileSize32 = SafeTruncateUInt64(fileSize.QuadPart);
-			result.contents = VirtualAlloc(nullptr, fileSize32, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			result.contents =
+				VirtualAlloc(nullptr, fileSize32, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 			if (result.contents) {
 				DWORD bytesRead;
 				if (ReadFile(fileHandle, result.contents, fileSize32, &bytesRead, nullptr) &&
@@ -63,13 +64,13 @@ internal DebugReadFileResult DEBUGPlatformReadEntireFile(char *a_Filename) {
 	return result;
 }
 
-internal void DEBUGPlatformFreeFileMemory(void *a_Memory) {
+void DEBUGPlatformFreeFileMemory(void *a_Memory) {
 	if (a_Memory) {
 		VirtualFree(a_Memory, 0, MEM_RELEASE);
 	}
 }
 
-internal bool32 DEBUGPlatformWriteEntireFile(char *a_Filename, uint32 a_MemorySize, void *a_Memory) {
+bool32 DEBUGPlatformWriteEntireFile(char *a_Filename, uint32 a_MemorySize, void *a_Memory) {
 	bool32 result = false;
 
 	// IMPORTANT: Create file doesn't create a directory!
@@ -240,37 +241,7 @@ internal LRESULT CALLBACK Win32MainWindowCallback(HWND a_Window, UINT a_Message,
 		case WM_SYSKEYUP:
 		case WM_KEYDOWN:
 		case WM_KEYUP: {
-			auto VKCode = uint32(a_WParam);
-			bool32 WasDown = (a_LParam & 1 << 30) != 0;
-			bool32 IsDown = (a_LParam & 1 << 31) == 0;
-			if (WasDown != IsDown) {
-				if (VKCode == 'W') {
-				} else if (VKCode == 'A') {
-				} else if (VKCode == 'S') {
-				} else if (VKCode == 'D') {
-				} else if (VKCode == 'Q') {
-				} else if (VKCode == 'E') {
-				} else if (VKCode == VK_UP) {
-				} else if (VKCode == VK_LEFT) {
-				} else if (VKCode == VK_DOWN) {
-				} else if (VKCode == VK_RIGHT) {
-				} else if (VKCode == VK_ESCAPE) {
-					OutputDebugStringA("ESCAPE: ");
-					if (IsDown) {
-						OutputDebugStringA("IsDown ");
-					}
-					if (WasDown) {
-						OutputDebugStringA("WasDown");
-					}
-					OutputDebugStringA("\n");
-				} else if (VKCode == VK_SPACE) {
-				}
-			}
-
-			bool32 AltKeyWasDown = a_LParam & 1 << 29;
-			if (VKCode == VK_F4 && AltKeyWasDown) {
-				g_Running = false;
-			}
+			Assert(!"Keyboard event came in through a non-dispatch message!");
 		}
 			break;
 
@@ -357,6 +328,78 @@ internal void Win32ProcessXInputDigitalButton(DWORD a_XInputButtonState,
 		(a_OldState->endedDown != a_NewState->endedDown) ? 1 : 0;
 }
 
+internal void Win32ProcessKeyboardMessage(GameButtonState *a_State,
+                                          bool32 a_IsDown) {
+	a_State->endedDown = a_IsDown;
+	++a_State->halfTransistionCount;
+}
+
+internal void Win32ProcessPendingMessages(GameControllerInput *a_GameControllerInput) {
+	MSG message;
+	while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE)) {
+		if (message.message == WM_QUIT) {
+			g_Running = false;
+		}
+
+		switch (message.message) {
+			case WM_SYSKEYDOWN:
+			case WM_SYSKEYUP:
+			case WM_KEYDOWN:
+			case WM_KEYUP: {
+				auto VKCode = uint32(message.wParam);
+				bool32 WasDown = (message.lParam & 1 << 30) != 0;
+				bool32 IsDown = (message.lParam & 1 << 31) == 0;
+				if (WasDown != IsDown) {
+					if (VKCode == 'W') {
+					} else if (VKCode == 'A') {
+					} else if (VKCode == 'S') {
+					} else if (VKCode == 'D') {
+					} else if (VKCode == 'Q') {
+						Win32ProcessKeyboardMessage(
+							&a_GameControllerInput->leftShoulder,
+							IsDown);
+					} else if (VKCode == 'E') {
+						Win32ProcessKeyboardMessage(
+							&a_GameControllerInput->rightShoulder,
+							IsDown);
+					} else if (VKCode == VK_UP) {
+						Win32ProcessKeyboardMessage(
+							&a_GameControllerInput->up,
+							IsDown);
+					} else if (VKCode == VK_LEFT) {
+						Win32ProcessKeyboardMessage(
+							&a_GameControllerInput->left,
+							IsDown);
+					} else if (VKCode == VK_DOWN) {
+						Win32ProcessKeyboardMessage(
+							&a_GameControllerInput->down,
+							IsDown);
+					} else if (VKCode == VK_RIGHT) {
+						Win32ProcessKeyboardMessage(
+							&a_GameControllerInput->right,
+							IsDown);
+					} else if (VKCode == VK_ESCAPE) {
+						g_Running = false;
+					} else if (VKCode == VK_SPACE) {
+					}
+				}
+
+				bool32 AltKeyWasDown = message.lParam & 1 << 29;
+				if (VKCode == VK_F4 && AltKeyWasDown) {
+					g_Running = false;
+				}
+			}
+				break;
+
+			default: {
+				TranslateMessage(&message);
+				DispatchMessageA(&message);
+			}
+				break;
+		}
+	}
+}
+
 int CALLBACK WinMain(HINSTANCE a_Instance, HINSTANCE a_PrevInstance,
                      LPSTR a_CommandLine, int a_ShowCode) {
 	LARGE_INTEGER perfCountFrequencyResult;
@@ -407,10 +450,10 @@ int CALLBACK WinMain(HINSTANCE a_Instance, HINSTANCE a_PrevInstance,
 
 			GameMemory gameMemory = {};
 			gameMemory.permanentStorageSize = Megabytes(64);
-			gameMemory.transientStorageSize = Gigabytes(uint64(4));
+			gameMemory.transientStorageSize = Gigabytes(1);
 
 			auto totalSize = gameMemory.permanentStorageSize + gameMemory.transientStorageSize;
-			gameMemory.permanentStorage = VirtualAlloc(baseAddress, totalSize,
+			gameMemory.permanentStorage = VirtualAlloc(baseAddress, size_t(totalSize),
 			                                           MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 			gameMemory.transientStorage = static_cast<uint8 *>(gameMemory.permanentStorage) +
 				gameMemory.permanentStorageSize;
@@ -424,16 +467,12 @@ int CALLBACK WinMain(HINSTANCE a_Instance, HINSTANCE a_PrevInstance,
 				QueryPerformanceCounter(&lastCounter);
 				auto lastCycleCount = __rdtsc();
 				while (g_Running) {
-					MSG message;
+					auto keyboardController = &newInput->controllers[0];
+					// TODO: Zeroing macro
+					auto zeroController = GameControllerInput{};
+					*keyboardController = zeroController;
 
-					while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE)) {
-						if (message.message == WM_QUIT) {
-							g_Running = false;
-						}
-
-						TranslateMessage(&message);
-						DispatchMessageA(&message);
-					}
+					Win32ProcessPendingMessages(keyboardController);
 
 					auto maxControllerCount = DWORD(XUSER_MAX_COUNT);
 					if (maxControllerCount > ArrayCount(newInput->controllers)) {
