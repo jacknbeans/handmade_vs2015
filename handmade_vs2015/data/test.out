@@ -37,11 +37,11 @@ internal void RenderWeirdGradient(GameOffscreenBuffer *a_Buffer,
 }
 
 void GameUpdateAndRender(GameMemory *a_GameMemory,
-                                  GameOffscreenBuffer *a_Buffer,
-                                  GameSoundOutputBuffer *a_SoundBuffer,
-                                  GameInput *a_Input) {
+                         GameOffscreenBuffer *a_Buffer,
+                         GameSoundOutputBuffer *a_SoundBuffer,
+                         GameInput *a_Input) {
 	Assert(sizeof(GameState) <= a_GameMemory->permanentStorageSize);
-                                  	
+
 	auto gameState = reinterpret_cast<GameState *>(a_GameMemory->permanentStorage);
 	if (!a_GameMemory->isInitialized) {
 		char *fileName = __FILE__;
@@ -58,15 +58,25 @@ void GameUpdateAndRender(GameMemory *a_GameMemory,
 		a_GameMemory->isInitialized = true;
 	}
 
-	auto input0 = &a_Input->controllers[0];
-	if (input0->isAnalog) {
-		gameState->blueOffset += int(4.f * input0->endX);
-		gameState->toneHz = 256 + int(128.f * input0->endY);
-	} else {
-	}
+	for (auto controllerIndex = 0;
+	     controllerIndex < ArrayCount(a_Input->controllers);
+	     ++controllerIndex) {
+		auto controller = GetController(a_Input, controllerIndex);
+		if (controller->isAnalog) {
+			gameState->blueOffset += int(4.f * controller->stickAverageX);
+			gameState->toneHz = 256 + int(128.f * controller->stickAverageY);
+		} else {
+			if (controller->moveLeft.endedDown) {
+				gameState->blueOffset -= 1;
+			}
+			if (controller->moveRight.endedDown) {
+				gameState->blueOffset += 1;
+			}
+		}
 
-	if (input0->down.endedDown) {
-		gameState->greenOffset += 1;
+		if (controller->actionDown.endedDown) {
+			gameState->greenOffset += 1;
+		}
 	}
 
 	GameOutputSound(a_SoundBuffer, gameState->toneHz);
